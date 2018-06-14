@@ -64,7 +64,7 @@ void fill_udp_hdr(union eth_buffer *buffer_u, uint16_t src_port, uint16_t dst_po
 	buffer_u->cooked_data.payload.udp.udphdr.udp_len = length; // Total packet length
 }
 
-void fill_dhcp_hdr(union eth_buffer *buffer_u )
+void fill_dhcp_hdr(union eth_buffer *buffer_u ,int dhcp_tp)
 {
 	buffer_u->cooked_data.payload.udp.payload.dhcp.dp_op = 2; // Boot operation (2 = reply)
 	buffer_u->cooked_data.payload.udp.payload.dhcp.dp_htype = 0x01; // Hardware type (0x01 = ethernet)
@@ -73,9 +73,35 @@ void fill_dhcp_hdr(union eth_buffer *buffer_u )
 	//buffer_u->cooked_data.payload.udp.payload.dhcp.dp_xid // Client generate this
 	buffer_u->cooked_data.payload.udp.payload.dhcp.dp_secs = 0; // Don't socket_address
 	buffer_u->cooked_data.payload.udp.payload.dhcp.dp_flags = 0x0000; // Unicast
-	//memcpy(buffer_u->cooked_data.payload.udp.payload.dhcp.dp_ciaddr, buffer_u->cooked_data.payload.ip.dst, 4); // Client IP
+	//buffer_u->cooked_data.payload.udp.payload.dhcp.dp_ciaddr // Client IP
 	memcpy(buffer_u->cooked_data.payload.udp.payload.dhcp.dp_yiaddr, buffer_u->cooked_data.payload.ip.dst, 4); // New client's IP
-	
+	memcpy(buffer_u->cooked_data.payload.udp.payload.dhcp.dp_siaddr, buffer_u->cooked_data.payload.ip.src, 4); // My IP
+	memset(buffer_u->cooked_data.payload.udp.payload.dhcp.dp_giaddr, 0, 6); // Don't care
+	//buffer_u->cooked_data.payload.udp.payload.dhcp.dp_chaddr // Client MAC
+	memset(buffer_u->cooked_data.payload.udp.payload.dhcp.dp_legacy, 0, sizeof(buffer_u->cooked_data.payload.udp.payload.dhcp.dp_legacy)); // Don't care
+	//buffer_u->cooked_data.payload.udp.payload.dhcp.dp_magic // Client cares :)
+	memset(buffer_u->cooked_data.payload.udp.payload.dhcp.dp_options, 0, sizeof(buffer_u->cooked_data.payload.udp.payload.dhcp.dp_options)); // Clean all
+	memcpy(buffer_u->cooked_data.payload.udp.payload.dhcp.dp_options, (dhcp_tp == 2)? "\x35\x01\x02" : "\x35\x01\x05", 3); // DHCP message type
+
+	memcpy(buffer_u->cooked_data.payload.udp.payload.dhcp.dp_options+3, "\x36\x04", 2);
+	memcpy(buffer_u->cooked_data.payload.udp.payload.dhcp.dp_options+5, buffer_u->cooked_data.payload.ip.src, 4); // My IP
+
+	memcpy(buffer_u->cooked_data.payload.udp.payload.dhcp.dp_options+9, "\x33\x04\x00\x01\x38\x80", 6); // Lease time
+
+	memcpy(buffer_u->cooked_data.payload.udp.payload.dhcp.dp_options+15, "\x01\x04\xff\xff\xff\x00", 6); // Subnet mask
+
+	memcpy(buffer_u->cooked_data.payload.udp.payload.dhcp.dp_options+21, "\x1c\x04", 2); // Broadcast
+	memcpy(buffer_u->cooked_data.payload.udp.payload.dhcp.dp_options+23, buffer_u->cooked_data.payload.ip.src, 3); // Subnet mask
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -138,10 +164,6 @@ int main(int argc, char *argv[])
 
 	/* To send data (in this case we will cook an ARP packet and broadcast it =])... */
 
-	/* fill the Ethernet frame header */
-	memcpy(buffer_u.cooked_data.ethernet.dst_addr, bcast_mac, 6);
-	memcpy(buffer_u.cooked_data.ethernet.src_addr, src_mac, 6);
-	buffer_u.cooked_data.ethernet.eth_type = htons(ETH_P_IP);
 
 	/* fill payload data */
 
