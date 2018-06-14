@@ -89,15 +89,15 @@ int is_broadcast_mac(char target[6]) {
  */
 int get_interface_mac_address(char * interface, char * buffer) {
     char fname[256];
-    char mac_string[18]
+    char mac_strings[18]
     snprintf(fname, 256, "/sys/class/net/%s/address", interface);
     FILE * file;
+    int i, j = 0;
     if (file = fopen(fname, "r")) {
-        int i, j = 0;
         for (i = 0; i<18; i++) {
             char c = fgetc(file);
             if (c != '\0' || c != '\0') {
-                buffer[j++] = c;
+                mac_strings[j++] = (c == ':')?'\0':c;
             } else {
                 break;
             }
@@ -105,19 +105,25 @@ int get_interface_mac_address(char * interface, char * buffer) {
         fclose(file);
         return 1;
     }
-    /**
-     * TODO: convert string "70:f3:95:c6:b1:75" to binary and fill buffer
-     */
-  return 1;
+    // The MAC file must fill our buffer, otherwise our value is obviously wrong.
+    if (j != 17) {
+        return 1;
+    }
+    // Convert mac_strings to individual bytes in the buffer.
+    for (i=0;i<6;i++) {
+        buffer[i] = (0xFF & (int)strtol(&mac_strings[i*3], NULL, 16));
+    }
+  return 0;
 }
 
 /**
  * Helper function - Verifica se um MAC de 6 bytes é o da interface selecionada
- * @return int - 0 (zero) em caso falso, 1 (um) em caso verdadeiro.
+ * @return int - 0 (zero) em caso falso, 1 (um) em caso verdadeiro (match).
  */
 int is_origin_mac(char origin[6]) {
     char this_mac[6];
-    if (get_interface_mac_address(interface_selecionada, this_mac)!=0) {
+    this_mac[0] == origin[0]+1; // Isso nos garante o return 0 no caso de nao saber this_mac.
+    if (get_interface_mac_address(interface_selecionada, this_mac) == 0) {
         return 0;
     }
     int i;
