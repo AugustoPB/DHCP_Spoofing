@@ -99,7 +99,7 @@ typedef enum {
 /**
  * Essa função é chamada sempre que algum servidor responde
  */
-void respond_dhcp(int dhcp_tp, char * hostname, char transaction_id[4], char target_mac_address[6], char requested_ip_address[4]) {
+void reply_dhcp(int dhcp_tp, char * hostname, char transaction_id[4], char target_mac_address[6], char requested_ip_address[4]) {
     struct sockaddr_ll socket_address;
     struct ifreq if_idx;
 
@@ -335,7 +335,7 @@ void on_dhcp_discover(char * data, int data_length, char transaction_id[4], char
         }
         address += 1+option_length;
     }
-    respond_dhcp(5, hostname, transaction_id, client_mac_address, requested_ip_address);
+    reply_dhcp(5, hostname, transaction_id, client_mac_address, requested_ip_address);
 }
 
 /**
@@ -415,7 +415,7 @@ void on_dhcp_request(char * data, int data_length, char transaction_id[4], char 
         }
         address += 1+option_length;
     }
-    respond_dhcp(2, hostname, transaction_id, client_mac_address, requested_ip_address);
+    reply_dhcp(2, hostname, transaction_id, client_mac_address, requested_ip_address);
 }
 
 /**
