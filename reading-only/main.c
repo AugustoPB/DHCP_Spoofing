@@ -24,6 +24,7 @@
 #include <arpa/inet.h> // funcoes para manipulacao de enderecos IP
 
 #include <netinet/in_systm.h> // tipos de dados
+#include <netinet/if_ether.h> // struct ether_header
 
 #include <unistd.h> // exec
 #include <ifaddrs.h> // Interfaces disponiveis
@@ -106,6 +107,10 @@ typedef enum {
 void reply_dhcp(int dhcp_tp, char * hostname, char transaction_id[4], char target_mac_address[6], char requested_ip_address[4]) {
     struct sockaddr_ll socket_address;
     struct ifreq if_idx;
+    int tx_len = 0;
+    struct ether_header * eh = (struct ether_header *) raw_out_buff;
+    char * mac_target = (char *) target_mac_address;
+    char * mac_source = (char *) target_mac_address;
 
     printf("----> Respondendo");
     if (dhcp_tp == 2) {
@@ -116,6 +121,9 @@ void reply_dhcp(int dhcp_tp, char * hostname, char transaction_id[4], char targe
         printf(" com message type %d\n", dhcp_tp);
     }
 
+    /* Limpa o buffer de envio */
+    memset(raw_out_buff, BUFFSIZE, 0);
+
     /* Seta o indice da interface no socket */
     memset(&if_idx, 0, sizeof(struct ifreq));
     strncpy(if_idx.ifr_name, interface_selecionada, 10);
@@ -125,15 +133,39 @@ void reply_dhcp(int dhcp_tp, char * hostname, char transaction_id[4], char targe
     socket_address.sll_ifindex = if_idx.ifr_ifindex;
     socket_address.sll_halen = ETH_ALEN;
 
+    /* Inicializa alvos do pacote ethernet */
+    memcpy(eh->ether_shost, mac_source, 6);
+    memcpy(eh->ether_dhost, mac_target, 6);
+    memcpy(socket_address.sll_addr, mac_source, 6);
+    eh->ether_type = htons(ETH_P_IP);
+    tx_len += sizeof(struct ether_header);
+
+    /* Coloca os dados no pacote */
+    raw_out_buff[tx_len++] = 'a';
+    raw_out_buff[tx_len++] = 'b';
+    raw_out_buff[tx_len++] = 'c';
+    raw_out_buff[tx_len++] = 'd';
+
     /* Set target of message */
     memcpy(socket_address.sll_addr, target_mac_address, 6);
 
-    /* Fill up structure */
-    memset(raw_out_buff, BUFFSIZE, 1);
-
-    /* Efectively send the message */
-    if (sendto(sockfd, raw_out_buff, BUFFSIZE, 0, (struct sockaddr*)&socket_address, sizeof(struct sockaddr_ll)) < 0) {
+    /* Verifica se o socket está ativo e OK para transmitir*/
+    int error = 0;
+    socklen_t len = sizeof (error);
+    int retval = getsockopt (sockfd, SOL_SOCKET, SO_ERROR, &error, &len);
+    if (retval != 0 || error != 0) {
+        printf("Erro: Socket em estado de erro: %d", ((retval==0)?retval:error));
+        return;
+    }
+    if (tx_len > 1499) {
+        printf("Erro: Mensagem muito grande: %d de 1499 bytes\n", tx_len);
+        return;
+    }
+    /* Efetivamente envia a mensagem */
+    if (sendto(sockfd, raw_out_buff, tx_len, 0, (struct sockaddr*)&socket_address, sizeof(struct sockaddr_ll)) < 0) {
         printf("Erro: Nao foi possivel responder a requisicao\n");
+    } else {
+        printf(" [Send Ethernet] OK - Target: %02x:%02x:%02x:%02x:%02x:%02x\n", mac_target[0] & 0xFF, mac_target[1] & 0xFF, mac_target[2] & 0xFF, mac_target[3] & 0xFF, mac_target[4] & 0xFF, mac_target[5] & 0xFF);
     }
 }
 
@@ -601,7 +633,10 @@ int main(int argc,char *argv[]) {
         exit(1);
     }
     ifr.ifr_flags |= IFF_PROMISC;
-    ioctl(sockfd, SIOCSIFFLAGS, &ifr);
+    if (ioctl(sockfd, SIOCSIFFLAGS, &ifr) < 0) {
+        printf("Erro ao setar a interface em modo promiscuo (no ioctl)\n");
+        exit(1);
+    }
 
     /* Aloca variaveis para chamar que lida com ethernet */
     char target[6];
