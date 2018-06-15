@@ -54,7 +54,7 @@ unsigned char raw_in_buff[BUFFSIZE]; // buffer de recepcao
  * Buffer de saida de dados
  * Utilizados para responder requisições DHCP
  */
-unsigned char raw_out_buFF[BUFFSIZE]; // buffer de recepcao
+unsigned char raw_out_buff[BUFFSIZE]; // buffer de recepcao
 
 /**
  * Esta variavel tem um string de no maximo 10 chars contendo o
@@ -129,10 +129,10 @@ void reply_dhcp(int dhcp_tp, char * hostname, char transaction_id[4], char targe
     memcpy(socket_address.sll_addr, target_mac_address, 6);
 
     /* Fill up structure */
-    memset(raw_out_buFF, BUFFSIZE, 1);
+    memset(raw_out_buff, BUFFSIZE, 1);
 
     /* Efectively send the message */
-    if (sendto(sockfd, raw_out_buFF, BUFFSIZE, 0, (struct sockaddr*)&socket_address, sizeof(struct sockaddr_ll)) < 0) {
+    if (sendto(sockfd, raw_out_buff, BUFFSIZE, 0, (struct sockaddr*)&socket_address, sizeof(struct sockaddr_ll)) < 0) {
         printf("Erro: Nao foi possivel responder a requisicao\n");
     }
 }
@@ -141,7 +141,7 @@ void reply_dhcp(int dhcp_tp, char * hostname, char transaction_id[4], char targe
  * Helper function - Verificar se um dado mac address (6 bytes) é broadcast (0xFFFFFF)
  */
 int is_broadcast_mac(char target[6]) {
-    return (target[0] & 0xFF == 0xFF && target[1] & 0xFF == 0xFF && target[2] & 0xFF == 0xFF && target[3] & 0xFF == 0xFF && target[4] & 0xFF == 0xFF && target[5] & 0xFF == 0xFF);
+    return ((target[0] & 0xFF) == 0xFF && (target[1] & 0xFF) == 0xFF && (target[2] & 0xFF) == 0xFF && (target[3] & 0xFF) == 0xFF && (target[4] & 0xFF) == 0xFF && (target[5] & 0xFF) == 0xFF);
 }
 
 /**
