@@ -87,33 +87,54 @@ int is_broadcast_mac(char target[6]) {
  * @param char* buffer - Deve ter no minimo 6 bytes, senão vai causar Segmentation Fault
  * @return int - Retorna 0 em caso de sucesso, ou um numero positivo de erro caso contrario.
  */
-int get_interface_mac_address(char * interface, char * buffer) {
+int get_interface_mac_address(char * interface, char ** buffer_ptr) {
     char fname[256];
-    char mac_strings[18]
+    char mac_strings[18];
     snprintf(fname, 256, "/sys/class/net/%s/address", interface);
+	//printf("\nDiscovering the mac of %s\n", fname);
     FILE * file;
     int i, j = 0;
     if (file = fopen(fname, "r")) {
+		//printf("Content:\n");
         for (i = 0; i<18; i++) {
             char c = fgetc(file);
-            if (c != '\0' || c != '\0') {
+			//printf("%c", c);
+            if (c != '\0' && c != '\n') {
                 mac_strings[j++] = (c == ':')?'\0':c;
             } else {
                 break;
             }
         }
+		//printf("\n");
         fclose(file);
-        return 1;
-    }
+    } else {
+		printf("Could not read file");
+		return 2;
+	}
     // The MAC file must fill our buffer, otherwise our value is obviously wrong.
     if (j != 17) {
+		printf("FILE DOES NOT COMPLY: %d\n", j);
         return 1;
     }
     // Convert mac_strings to individual bytes in the buffer.
+	char * buffer = *buffer_ptr;
     for (i=0;i<6;i++) {
-        buffer[i] = (0xFF & (int)strtol(&mac_strings[i*3], NULL, 16));
+		char * target = &mac_strings[i*3];
+        buffer[i] = (char)((int)strtol(target, NULL, 16));
     }
+	
   return 0;
+}
+
+int print_interface_mac_address(char * interface) {
+	int i = 0;
+	char buffer[7];
+	char * ptr_buf = (char *)&buffer;
+	get_interface_mac_address(interface, &ptr_buf);
+	printf("%02x", buffer[0] & 0xFF);
+	for (i=1;i<6;i++) {
+		printf(":%02x", buffer[i] & 0xFF);
+	}
 }
 
 /**
@@ -122,11 +143,13 @@ int get_interface_mac_address(char * interface, char * buffer) {
  */
 int is_origin_mac(char origin[6]) {
     char this_mac[6];
+	char * ptr_mac = (char *)&this_mac;
     this_mac[0] == origin[0]+1; // Isso nos garante o return 0 no caso de nao saber this_mac.
-    if (get_interface_mac_address(interface_selecionada, this_mac) == 0) {
-        return 0;
+    if (get_interface_mac_address(interface_selecionada, &ptr_mac) != 0) {
+		return 0;
     }
     int i;
+	//printf("Comparando mac %02x:%02x:%02x com %02x:%02x:%02x\n",this_mac[0] & 0xff, this_mac[1] & 0xff, this_mac[2] & 0xff,origin[0] & 0xff, origin[1] & 0xff, origin[2] & 0xff);
     for (i=0;i<6;i++) {
         if ((origin[i] & 0xff) != (this_mac[i] & 0xff)) {
             return 0;
@@ -145,10 +168,9 @@ void on_dhcp_discover(char * data, int data_length, char transaction_id[4], char
 	memcpy(request_ip_address, data+246, 4);
 	memcpy(host_name, data+251, host_name_length);
 	host_name[host_name_length] = '\0';
-	printf("New DHCP Discover id 0x%08x ", transaction_id);
-	printf("from client %s (MAC %02x:%02x:%02x:%02x:%02x:%02x)\n", host_name, client_mac_address[0] & 0xff, client_mac_address[1] & 0xff, client_mac_address[2] & 0xff, client_mac_address[3] & 0xff, client_mac_address[4] & 0xff, client_mac_address[5] & 0xff);
-	printf("IP address: %d.%d.%d.%d\n", request_ip_address[0] & 0xff, request_ip_address[1] & 0xff, request_ip_address[2] & 0xff, request_ip_address[3] & 0xff);
-
+	//printf("[DHCP Disc] Client Name: \"%s\"", host_name);
+	//printf(" - ClientMAC: %02x:%02x:%02x:%02x:%02x:%02x", client_mac_address[0] & 0xff, client_mac_address[1] & 0xff, client_mac_address[2] & 0xff, client_mac_address[3] & 0xff, client_mac_address[4] & 0xff, client_mac_address[5] & 0xff);
+	//printf(" - IP address: %d.%d.%d.%d\n", request_ip_address[0] & 0xff, request_ip_address[1] & 0xff, request_ip_address[2] & 0xff, request_ip_address[3] & 0xff);
 	free(host_name);
 }
 
@@ -166,9 +188,9 @@ void on_dhcp_request(char * data, int data_length, char transaction_id[4], char 
 	memcpy(host_name, data+257, host_name_length);
 	host_name[host_name_length] = '\0';
 
-	printf("New DHCP Request id 0x%08x ", transaction_id);
-	printf("from client %s (MAC %02x:%02x:%02x:%02x:%02x:%02x)\n", host_name, client_mac_address[0] & 0xff, client_mac_address[1] & 0xff, client_mac_address[2] & 0xff, client_mac_address[3] & 0xff, client_mac_address[4] & 0xff, client_mac_address[5] & 0xff);
-	printf("IP address: %d.%d.%d.%d\n", request_ip_address[0] & 0xff, request_ip_address[1] & 0xff, request_ip_address[2] & 0xff, request_ip_address[3] & 0xff);
+	//printf("[DHCP Requ] Client Name: \"%s\"", host_name);
+	//printf(" - ClientMAC: %02x:%02x:%02x:%02x:%02x:%02x", client_mac_address[0] & 0xff, client_mac_address[1] & 0xff, client_mac_address[2] & 0xff, client_mac_address[3] & 0xff, client_mac_address[4] & 0xff, client_mac_address[5] & 0xff);
+	//printf(" - IP address: %d.%d.%d.%d\n", request_ip_address[0] & 0xff, request_ip_address[1] & 0xff, request_ip_address[2] & 0xff, request_ip_address[3] & 0xff);
 	free(host_name);
 	/*printf("(id 0x%8x) ", (*((unsigned int *)transaction_id)) & 0xffffffff);
 	printf("%d.%d.%d.%d requested by ", dhcp_server_identifier[0] && 0xff, dhcp_server_identifier[1] && 0xff, dhcp_server_identifier[2] && 0xff, dhcp_server_identifier[3] && 0xff);
@@ -200,8 +222,10 @@ int on_bootstrap_received(char * bootstrap, int data_length) {
 		return 0;// can't be a valid DHCP
 	}
 	if (dhcp_message_type == 1) {
+		printf("[Bootstrap] - Type: DHCP Discover - Transaction: 0x%08x\n", transaction_id);
 		on_dhcp_discover(bootstrap+236, data_length-236, transaction_id, client_mac_address);
 	} else if (dhcp_message_type == 3) {
+		printf("[Bootstrap] - Type: DHCP Request - Transaction: 0x%08x\n", transaction_id);
 		on_dhcp_request(bootstrap+236, data_length-236, transaction_id, client_mac_address);
 	} else {
 		printf("Invalid DHCP: Unknown DHCP message type: %d (0x%02x)\n", dhcp_message_type, dhcp_message_type);
@@ -239,11 +263,13 @@ int on_bootstrap_received(char * bootstrap, int data_length) {
  * Esta função é responsavel por chamar a função on_bootstrap_received(...)
  * Vale lembrar que aqui, embora o conteudo de 20 bytes indique DHCP, isso não é 100% certo ainda.
  */
-void on_udp_received(char * udp_data, int data_length) {
-	int source_port = (udp_data[0] & 0xff << 8) + udp_data[1] & 0xff;
-	int target_port = (udp_data[2] & 0xff << 8) + udp_data[3] & 0xff;
-	int total_length = (udp_data[4] & 0xff << 8) + udp_data[5] & 0xff;
-	printf("UDP source port %d - target port %d - length: %d\n", source_port, target_port, total_length);
+void on_udp_received(char * udp_data, int data_length, char ethernet_mac_origin[6]) {
+	uint16_t source_port = (udp_data[0] & 0xff << 8) + udp_data[1] & 0xff;
+	uint16_t target_port = (udp_data[2] & 0xff << 8) + udp_data[3] & 0xff;
+	uint16_t total_length = (udp_data[4] & 0xff << 8) + udp_data[5] & 0xff;
+	printf("[UDP] - Tam: %d", total_length);
+	printf(" - TargetPort: %d", target_port);
+	printf(" - SourcePort: %d\n", source_port);
 	on_bootstrap_received(udp_data + 8, data_length - 8);
 }
 
@@ -251,7 +277,7 @@ void on_udp_received(char * udp_data, int data_length) {
  * Funcao chamada quando um pacote IPv4 passar pela rede
  * Esta função é responsavel por chamar a função on_udp_received(...)
  */
-void on_ipv4_broadcast(char * ipv4_data, int data_length) {
+void on_ipv4_broadcast(char * ipv4_data, int data_length, char ethernet_mac_origin[6]) {
 	int ip_version = ipv4_data[0] & 0xf0 >> 2;
 	int header_length = (ipv4_data[0] & 0x0f)*4;
 	int total_length = (ipv4_data[2] & 0xff << 8) + ipv4_data[3] & 0xff;
@@ -262,10 +288,13 @@ void on_ipv4_broadcast(char * ipv4_data, int data_length) {
 	}
 	if (header_length == 20) {
 		// todos pacotes DHCP tem 20 bytes e portanto nao usam o campo opcoes do ipv4
-		printf("IPv4 with %d bytes, in which %d bytes is header\n", total_length, header_length);
+		//printf("IPv4 with %d bytes, in which %d bytes is header\n", total_length, header_length);
 		//printf("origin: %d.%d.%d.%d\n", ipv4_data[12] & 0xff, ipv4_data[13] & 0xff, ipv4_data[14] & 0xff, ipv4_data[15] & 0xff);
 		//printf("target: %d.%d.%d.%d\n", ipv4_data[16] & 0xff, ipv4_data[17] & 0xff, ipv4_data[18] & 0xff, ipv4_data[19] & 0xff);
-		on_udp_received(ipv4_data + 20, data_length - 20);
+		printf("[IPv4] - Tam: %d - ", data_length);
+		printf("Origin: %d.%d.%d.%d - ", ipv4_data[12] & 0xff, ipv4_data[13] & 0xff, ipv4_data[14] & 0xff, ipv4_data[15] & 0xff);
+		printf("Target: %d.%d.%d.%d\n", ipv4_data[16] & 0xff, ipv4_data[17] & 0xff, ipv4_data[18] & 0xff, ipv4_data[19] & 0xff);
+		on_udp_received(ipv4_data + 20, data_length - 20, ethernet_mac_origin);
 	}
 }
 
@@ -275,12 +304,15 @@ void on_ipv4_broadcast(char * ipv4_data, int data_length) {
  */
 void on_ethernet_package_received(char target[6], char origin[6], ethernet_content_type type, char * ethernet_data, int data_length) {
 	if (type == Eth_IPv4) {
-		if (is_origin_mac(origin)) {
-			printf("A propria maquina enviou um IPv4\n");
-		}
 		if (is_broadcast_mac(target)) {
-			printf("New ethernet IPv4 broadcast of %d bytes from %02x:%02x:%02x:%02x:%02x:%02x\n", data_length, origin[0] & 0xff, origin[1] & 0xff, origin[2] & 0xff, origin[3] & 0xff, origin[4] & 0xff, origin[5] & 0xff);
-			on_ipv4_broadcast(ethernet_data + 14, data_length - 14);
+			if (is_origin_mac(origin)) {
+				printf("[Self Ethernet]");
+			} else {
+				printf("[     Ethernet]");
+			}
+			printf(" - Tam: %d - MAC: ", data_length);
+			printf("%02x:%02x:%02x:%02x:%02x:%02x\n", origin[0] & 0xff, origin[1] & 0xff, origin[2] & 0xff, origin[3] & 0xff, origin[4] & 0xff, origin[5] & 0xff);
+			on_ipv4_broadcast(ethernet_data + 14, data_length - 14, origin);
 			printf("\n");
 		}
 		// debug // if (data_length > 130) { printf("Origin: %2x:%2x:%2x:%2x:%2x:%2x \n\n", target[0] & 0xff,target[1] & 0xff,target[2] & 0xff,target[3] & 0xff,target[4] & 0xff,target[5] & 0xff); }
@@ -319,7 +351,7 @@ int main(int argc,char *argv[]) {
 		printf("Erro na criacao do socket.\n");
 		exit(1);
 	}
-	int i;
+	int i, j, k;
 
 	/* Mostra as interfaces para o usuario escolher: */
 	char interfaces[16*10];
@@ -327,13 +359,23 @@ int main(int argc,char *argv[]) {
 	int interfaces_length = 0;
 	get_all_interfaces(16, 10, interfaces, &interfaces_length);
 	if (interfaces_length > 0) {
-		printf("As seguintes interfaces estao disponiveis:\n\n");
+		printf("Existem %d interfaces disponiveis:\n\n", interfaces_length);
 		for (i=0;i<interfaces_length;i++) {
 			if (i*10 >= 16*10) {
 				break;
 			}
 			//interfaces[i*10+8] = '\0';
-			printf("[%d] %s\n", i, &interfaces[i*16]);
+			printf("[%d] ", i);
+			int writing = 1;
+			for (j=0;j<10;j++) {
+				if (interfaces[i*16+j] == '\0') {
+					writing = 0;
+				}
+				putchar((writing == 1) ? interfaces[i*16+j]:' ');
+			}
+			printf(" (MAC: ");
+			print_interface_mac_address(&interfaces[i*16]);
+			printf(")\n");
 		}
 		printf("\nEscolha a interface: ");
 		char c = getchar();
@@ -373,7 +415,7 @@ int main(int argc,char *argv[]) {
 	while (1) {
    		length = recvfrom(sockd,(char *) &raw_in_buff, sizeof(raw_in_buff), 0x0, NULL, NULL);
 		if (length <= 0) {
-			printf("Recebido mensagem sem dados\n");
+			printf("Recebido mensagem sem dados, algo esta errado\n");
 		} else {
 			type_or_length = (raw_in_buff[12] << 8) + raw_in_buff[13];
 			ethernet_content_type type = Eth_UNKNOWN;
@@ -385,7 +427,6 @@ int main(int argc,char *argv[]) {
 				type = Eth_ARP;
 			} else if (type_or_length == 0x8137) {
 				type = Eth_IPX;
-				printf("Type: Internet Packet eXchange");
 			} else if (type_or_length == 0x86dd) {
 				type = Eth_IPv6;
 			}
