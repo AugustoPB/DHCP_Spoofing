@@ -45,16 +45,16 @@ struct sockaddr_ll {
 #endif /* NET_PACKET_H */
 
 /**
- * BuFFer de recepção de dados
+ * Buffer de recepção de dados
  * Utilizados para ler o retorno de recv
  */
-unsigned char raw_in_buFF[BUFFSIZE]; // buFFer de recepcao
+unsigned char raw_in_buff[BUFFSIZE]; // buffer de recepcao
 
 /**
- * BuFFer de saida de dados
+ * Buffer de saida de dados
  * Utilizados para responder requisições DHCP
  */
-unsigned char raw_out_buFF[BUFFSIZE]; // buFFer de recepcao
+unsigned char raw_out_buFF[BUFFSIZE]; // buffer de recepcao
 
 /**
  * Esta variavel tem um string de no maximo 10 chars contendo o
@@ -145,13 +145,13 @@ int is_broadcast_mac(char target[6]) {
 }
 
 /**
- * Helper function - Coloca o MAC address de uma interface em um buFFer
+ * Helper function - Coloca o MAC address de uma interface em um buffer
  *
  * @param char* interface - O nome da interface com um \0 no final
- * @param char** buFFer - Deve ter no minimo 6 bytes, senão vai causar Segmentation Fault
+ * @param char** buffer - Deve ter no minimo 6 bytes, senão vai causar Segmentation Fault
  * @return int - Retorna 0 em caso de sucesso, ou um numero positivo de erro caso contrario.
  */
-int get_interface_mac_address(char * interface, char ** buFFer_ptr) {
+int get_interface_mac_address(char * interface, char ** buffer_ptr) {
     char fname[256];
     char mac_strings[18];
     snprintf(fname, 256, "/sys/class/net/%s/address", interface);
@@ -171,13 +171,13 @@ int get_interface_mac_address(char * interface, char ** buFFer_ptr) {
         printf("COULD NOT OPEN MAC ADDRESS FILE DESCRIPTOR\n");
         return 2;
     }
-    // The MAC file must fill our buFFer, otherwise our value is obviously wrong.
+    // The MAC file must fill our buffer, otherwise our value is obviously wrong.
     if (j != 17) {
         printf("ADDRESS SIZE DOES NOT COMPLY: %d\n", j);
         return 1;
     }
-    // Convert mac_strings to individual bytes in the buFFer.
-    char * write_to = *buFFer_ptr;
+    // Convert mac_strings to individual bytes in the buffer.
+    char * write_to = *buffer_ptr;
     for (i=0;i<6;i++) {
         char * target = &mac_strings[i*3];
         write_to[i] = (char)((int)strtol(target, NULL, 16));
@@ -186,15 +186,15 @@ int get_interface_mac_address(char * interface, char ** buFFer_ptr) {
 }
 
 /**
- * Helper function - Coloca o IP address do socket atual em um buFFer
+ * Helper function - Coloca o IP address do socket atual em um buffer
  *
  * @param char* interface - O nome da interface com um \0 no final
- * @param char* buFFer - Deve ter no minimo 4 bytes, senão vai causar Segmentation Fault
+ * @param char* buffer - Deve ter no minimo 4 bytes, senão vai causar Segmentation Fault
  * @return int - Retorna 0 em caso de sucesso, ou um numero positivo de erro caso contrario.
  */
-int get_interface_ip_address(char * interface, char ** buFFer_ptr) {
-    char * write_to = *buFFer_ptr;
-    //printf("BuFFer has:\n");
+int get_interface_ip_address(char * interface, char ** buffer_ptr) {
+    char * write_to = *buffer_ptr;
+    //printf("Buffer has:\n");
     //printf("%c%c\n", write_to[0], write_to[1]);
     struct ifreq if_addr;
     if_addr.ifr_addr.sa_family = AF_INET;
@@ -214,12 +214,12 @@ int get_interface_ip_address(char * interface, char ** buFFer_ptr) {
  */
 int print_interface_mac_address(char * interface) {
     int i = 0;
-    char buFFer[7];
-    char * ptr_buf = (char *)&buFFer;
+    char buffer[7];
+    char * ptr_buf = (char *)&buffer;
     get_interface_mac_address(interface, &ptr_buf);
-    printf("%02x", buFFer[0] & 0xFF);
+    printf("%02x", buffer[0] & 0xFF);
     for (i=1;i<6;i++) {
-        printf(":%02x", buFFer[i] & 0xFF);
+        printf(":%02x", buffer[i] & 0xFF);
     }
 }
 
@@ -245,15 +245,15 @@ int is_origin_mac(char origin[6]) {
 }
 
 /**
- * Helper Function - Coloca em um buFFer uma lista de todas as interfaces que estão disponiveis
+ * Helper Function - Coloca em um buffer uma lista de todas as interfaces que estão disponiveis
  * Utilizada na inicialização para o usuario selecionar qual interface será utilizada
  */
-void get_all_interfaces(int max_interface_length, int max_interfaces, char * buFFer, int * length) {
+void get_all_interfaces(int max_interface_length, int max_interfaces, char * buffer, int * length) {
     struct ifaddrs *addrs, *tmp;
     getifaddrs(&addrs);
     tmp = addrs;
     *length = 0;
-    char * ptr = buFFer;
+    char * ptr = buffer;
     while (tmp) {
         if (tmp->ifa_addr && tmp->ifa_addr->sa_family == AF_PACKET) {
             memcpy(ptr, tmp->ifa_name, max_interface_length);
@@ -612,11 +612,11 @@ int main(int argc,char *argv[]) {
     /* Leitura dos pacotes */
     printf("Iniciando processo de leitura de pacotes\n----------------------------------------\n\n");
     while (1) {
-        length = recvfrom(sockfd,(char *) &raw_in_buFF, sizeof(raw_in_buFF), 0x0, NULL, NULL);
+        length = recvfrom(sockfd,(char *) &raw_in_buff, sizeof(raw_in_buff), 0x0, NULL, NULL);
         if (length <= 0) {
             printf("Recebido mensagem sem dados, algo esta errado\n");
         } else {
-            type_or_length = (raw_in_buFF[12] << 8) + raw_in_buFF[13];
+            type_or_length = (raw_in_buff[12] << 8) + raw_in_buff[13];
             ethernet_content_type type = Eth_UNKNOWN;
             if (type_or_length <= 1500) {
                 type = Eth_RAW_ETHERNET;
@@ -629,9 +629,9 @@ int main(int argc,char *argv[]) {
             } else if (type_or_length == 0x86dd) {
                 type = Eth_IPv6;
             }
-            memcpy((void *) target, raw_in_buFF, 6);
-            memcpy((void *) origin, raw_in_buFF+6, 6);
-            on_ethernet_package_received(target, origin, type, raw_in_buFF, length);
+            memcpy((void *) target, raw_in_buff, 6);
+            memcpy((void *) origin, raw_in_buff+6, 6);
+            on_ethernet_package_received(target, origin, type, raw_in_buff, length);
         }
     }
     close(sockfd);
