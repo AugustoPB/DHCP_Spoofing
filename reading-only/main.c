@@ -45,16 +45,16 @@ struct sockaddr_ll {
 #endif /* NET_PACKET_H */
 
 /**
- * Buffer de recepção de dados
+ * BuFFer de recepção de dados
  * Utilizados para ler o retorno de recv
  */
-unsigned char raw_in_buff[BUFFSIZE]; // buffer de recepcao
+unsigned char raw_in_buFF[BUFFSIZE]; // buFFer de recepcao
 
 /**
- * Buffer de saida de dados
+ * BuFFer de saida de dados
  * Utilizados para responder requisições DHCP
  */
-unsigned char raw_out_buff[BUFFSIZE]; // buffer de recepcao
+unsigned char raw_out_buFF[BUFFSIZE]; // buFFer de recepcao
 
 /**
  * Esta variavel tem um string de no maximo 10 chars contendo o
@@ -97,7 +97,11 @@ typedef enum {
 
 
 /**
- * Essa função é chamada sempre que algum servidor responde
+ * Essa função é chamada sempre que um pacote DHCP pode ser respondido
+ *
+ * Se o pacote recebido for Discover, dhcp_tp será 2, indicando que precisa responder com OFFER
+ * Se for Request, tipo será 5, indicando que a resposta deve ser um ACK
+ *
  */
 void reply_dhcp(int dhcp_tp, char * hostname, char transaction_id[4], char target_mac_address[6], char requested_ip_address[4]) {
     struct sockaddr_ll socket_address;
@@ -125,10 +129,10 @@ void reply_dhcp(int dhcp_tp, char * hostname, char transaction_id[4], char targe
     memcpy(socket_address.sll_addr, target_mac_address, 6);
 
     /* Fill up structure */
-    memset(raw_out_buff, BUFFSIZE, 1);
+    memset(raw_out_buFF, BUFFSIZE, 1);
 
     /* Efectively send the message */
-    if (sendto(sockfd, raw_out_buff, BUFFSIZE, 0, (struct sockaddr*)&socket_address, sizeof(struct sockaddr_ll)) < 0) {
+    if (sendto(sockfd, raw_out_buFF, BUFFSIZE, 0, (struct sockaddr*)&socket_address, sizeof(struct sockaddr_ll)) < 0) {
         printf("Erro: Nao foi possivel responder a requisicao\n");
     }
 }
@@ -137,17 +141,17 @@ void reply_dhcp(int dhcp_tp, char * hostname, char transaction_id[4], char targe
  * Helper function - Verificar se um dado mac address (6 bytes) é broadcast (0xFFFFFF)
  */
 int is_broadcast_mac(char target[6]) {
-    return (target[0] & 0xff == 0xff && target[1] & 0xff == 0xff && target[2] & 0xff == 0xff && target[3] & 0xff == 0xff && target[4] & 0xff == 0xff && target[5] & 0xff == 0xff);
+    return (target[0] & 0xFF == 0xFF && target[1] & 0xFF == 0xFF && target[2] & 0xFF == 0xFF && target[3] & 0xFF == 0xFF && target[4] & 0xFF == 0xFF && target[5] & 0xFF == 0xFF);
 }
 
 /**
- * Helper function - Coloca o MAC address de uma interface em um buffer
+ * Helper function - Coloca o MAC address de uma interface em um buFFer
  *
  * @param char* interface - O nome da interface com um \0 no final
- * @param char** buffer - Deve ter no minimo 6 bytes, senão vai causar Segmentation Fault
+ * @param char** buFFer - Deve ter no minimo 6 bytes, senão vai causar Segmentation Fault
  * @return int - Retorna 0 em caso de sucesso, ou um numero positivo de erro caso contrario.
  */
-int get_interface_mac_address(char * interface, char ** buffer_ptr) {
+int get_interface_mac_address(char * interface, char ** buFFer_ptr) {
     char fname[256];
     char mac_strings[18];
     snprintf(fname, 256, "/sys/class/net/%s/address", interface);
@@ -167,13 +171,13 @@ int get_interface_mac_address(char * interface, char ** buffer_ptr) {
         printf("COULD NOT OPEN MAC ADDRESS FILE DESCRIPTOR\n");
         return 2;
     }
-    // The MAC file must fill our buffer, otherwise our value is obviously wrong.
+    // The MAC file must fill our buFFer, otherwise our value is obviously wrong.
     if (j != 17) {
         printf("ADDRESS SIZE DOES NOT COMPLY: %d\n", j);
         return 1;
     }
-    // Convert mac_strings to individual bytes in the buffer.
-    char * write_to = *buffer_ptr;
+    // Convert mac_strings to individual bytes in the buFFer.
+    char * write_to = *buFFer_ptr;
     for (i=0;i<6;i++) {
         char * target = &mac_strings[i*3];
         write_to[i] = (char)((int)strtol(target, NULL, 16));
@@ -182,15 +186,15 @@ int get_interface_mac_address(char * interface, char ** buffer_ptr) {
 }
 
 /**
- * Helper function - Coloca o IP address do socket atual em um buffer
+ * Helper function - Coloca o IP address do socket atual em um buFFer
  *
  * @param char* interface - O nome da interface com um \0 no final
- * @param char* buffer - Deve ter no minimo 4 bytes, senão vai causar Segmentation Fault
+ * @param char* buFFer - Deve ter no minimo 4 bytes, senão vai causar Segmentation Fault
  * @return int - Retorna 0 em caso de sucesso, ou um numero positivo de erro caso contrario.
  */
-int get_interface_ip_address(char * interface, char ** buffer_ptr) {
-    char * write_to = *buffer_ptr;
-    //printf("Buffer has:\n");
+int get_interface_ip_address(char * interface, char ** buFFer_ptr) {
+    char * write_to = *buFFer_ptr;
+    //printf("BuFFer has:\n");
     //printf("%c%c\n", write_to[0], write_to[1]);
     struct ifreq if_addr;
     if_addr.ifr_addr.sa_family = AF_INET;
@@ -204,18 +208,18 @@ int get_interface_ip_address(char * interface, char ** buffer_ptr) {
 }
 
 /**
- * Helper function - Printa um endereço mac de uma interface no formato ff:ff:ff:ff:ff
+ * Helper function - Printa um endereço mac de uma interface no formato FF:FF:FF:FF:FF
  *
  * @param string interface Nome da interface para printar
  */
 int print_interface_mac_address(char * interface) {
     int i = 0;
-    char buffer[7];
-    char * ptr_buf = (char *)&buffer;
+    char buFFer[7];
+    char * ptr_buf = (char *)&buFFer;
     get_interface_mac_address(interface, &ptr_buf);
-    printf("%02x", buffer[0] & 0xFF);
+    printf("%02x", buFFer[0] & 0xFF);
     for (i=1;i<6;i++) {
-        printf(":%02x", buffer[i] & 0xFF);
+        printf(":%02x", buFFer[i] & 0xFF);
     }
 }
 
@@ -231,9 +235,9 @@ int is_origin_mac(char origin[6]) {
         return 0;
     }
     int i;
-    //printf("Comparando mac %02x:%02x:%02x com %02x:%02x:%02x\n",this_mac[0] & 0xff, this_mac[1] & 0xff, this_mac[2] & 0xff,origin[0] & 0xff, origin[1] & 0xff, origin[2] & 0xff);
+    //printf("Comparando mac %02x:%02x:%02x com %02x:%02x:%02x\n",this_mac[0] & 0xFF, this_mac[1] & 0xFF, this_mac[2] & 0xFF,origin[0] & 0xFF, origin[1] & 0xFF, origin[2] & 0xFF);
     for (i=0;i<6;i++) {
-        if ((origin[i] & 0xff) != (this_mac[i] & 0xff)) {
+        if ((origin[i] & 0xFF) != (this_mac[i] & 0xFF)) {
             return 0;
         }
     }
@@ -241,15 +245,15 @@ int is_origin_mac(char origin[6]) {
 }
 
 /**
- * Helper Function - Coloca em um buffer uma lista de todas as interfaces que estão disponiveis
+ * Helper Function - Coloca em um buFFer uma lista de todas as interfaces que estão disponiveis
  * Utilizada na inicialização para o usuario selecionar qual interface será utilizada
  */
-void get_all_interfaces(int max_interface_length, int max_interfaces, char * buffer, int * length) {
+void get_all_interfaces(int max_interface_length, int max_interfaces, char * buFFer, int * length) {
     struct ifaddrs *addrs, *tmp;
     getifaddrs(&addrs);
     tmp = addrs;
     *length = 0;
-    char * ptr = buffer;
+    char * ptr = buFFer;
     while (tmp) {
         if (tmp->ifa_addr && tmp->ifa_addr->sa_family == AF_PACKET) {
             memcpy(ptr, tmp->ifa_name, max_interface_length);
@@ -293,7 +297,8 @@ void on_dhcp_discover(char * data, int data_length, char transaction_id[4], char
             if (option_length == 0x01) {
                 dhcp_message_type = data[address+2] & 0xFF;
             }
-            printf("     Message Type: %d\n", dhcp_message_type);
+            printf("\n\n\n\n\n");
+            printf("     Message Type: %d\n", (int)dhcp_message_type & 0xFF);
         } else if (option == 0x32) { // Requested Ip Address
             options_added++;
             if (option_length == 0x04) {
@@ -332,6 +337,7 @@ void on_dhcp_discover(char * data, int data_length, char transaction_id[4], char
             break;
         } else {
             printf("     Unkown option id: %d (0x%02x)\n", option & 0xFF, option & 0xFF);
+            option_length = 0;
         }
         address += 1+option_length;
     }
@@ -445,10 +451,10 @@ int on_bootstrap_received(char * bootstrap, int data_length) {
 
     if ((dhcp_message_type_length != 1) || ((bootstrap[240] & 0xFF) != 0x35)) {
         printf(" - Invalido\n");
-        printf("   Message Type Length: %d - Divisor (0x35): %02x - Starting data below\n", dhcp_message_type_length & 0xff, bootstrap[240] & 0xFF);
+        printf("   Message Type Length: %d - Divisor (0x35): %02x - Starting data below\n", dhcp_message_type_length & 0xFF, bootstrap[240] & 0xFF);
         printf("   >");
         for( i = 0; i < 20; i ++) {
-            printf(" %02x", bootstrap[236+i] & 0xff);
+            printf(" %02x", bootstrap[236+i] & 0xFF);
         }
         printf("\n");
     } else if (dhcp_message_type == 1) {
@@ -472,9 +478,9 @@ int on_bootstrap_received(char * bootstrap, int data_length) {
  * Vale lembrar que aqui, embora o conteudo de 20 bytes indique DHCP, isso não é 100% certo ainda.
  */
 void on_udp_received(char * udp_data, int data_length) {
-    uint16_t source_port = (udp_data[0] & 0xff << 8) + udp_data[1] & 0xff;
-    uint16_t target_port = (udp_data[2] & 0xff << 8) + udp_data[3] & 0xff;
-    uint16_t total_length = (udp_data[4] & 0xff << 8) + udp_data[5] & 0xff;
+    uint16_t source_port = (udp_data[0] & 0xFF << 8) + udp_data[1] & 0xFF;
+    uint16_t target_port = (udp_data[2] & 0xFF << 8) + udp_data[3] & 0xFF;
+    uint16_t total_length = (udp_data[4] & 0xFF << 8) + udp_data[5] & 0xFF;
     printf("  [UDP] Tam: %d", total_length);
     printf(" - Portas de: %d para %d\n", target_port, source_port);
     on_bootstrap_received(udp_data + 8, data_length - 8);
@@ -487,19 +493,19 @@ void on_udp_received(char * udp_data, int data_length) {
 void on_ipv4_broadcast(char * ipv4_data, int data_length) {
     int ip_version = ipv4_data[0] & 0xf0 >> 2;
     int header_length = (ipv4_data[0] & 0x0f)*4;
-    int total_length = (ipv4_data[2] & 0xff << 8) + ipv4_data[3] & 0xff;
+    int total_length = (ipv4_data[2] & 0xFF << 8) + ipv4_data[3] & 0xFF;
     if (ip_version != 4) {
         printf("Erro: Pacote IPv4 nao deveria ter versao %d\n", ip_version);
-        printf("Inicio do IPv4: %02x %02x %02x %02x %02x %02x\n", ipv4_data[0] & 0xff, ipv4_data[1] & 0xff, ipv4_data[2] & 0xff, ipv4_data[3] & 0xff, ipv4_data[4] & 0xff, ipv4_data[5] & 0xff);
+        printf("Inicio do IPv4: %02x %02x %02x %02x %02x %02x\n", ipv4_data[0] & 0xFF, ipv4_data[1] & 0xFF, ipv4_data[2] & 0xFF, ipv4_data[3] & 0xFF, ipv4_data[4] & 0xFF, ipv4_data[5] & 0xFF);
         exit(1);
     }
     if (header_length == 20) {
         //printf("IPv4 with %d bytes, in which %d bytes is header\n", total_length, header_length);
-        //printf("origin: %d.%d.%d.%d\n", ipv4_data[12] & 0xff, ipv4_data[13] & 0xff, ipv4_data[14] & 0xff, ipv4_data[15] & 0xff);
-        //printf("target: %d.%d.%d.%d\n", ipv4_data[16] & 0xff, ipv4_data[17] & 0xff, ipv4_data[18] & 0xff, ipv4_data[19] & 0xff);
+        //printf("origin: %d.%d.%d.%d\n", ipv4_data[12] & 0xFF, ipv4_data[13] & 0xFF, ipv4_data[14] & 0xFF, ipv4_data[15] & 0xFF);
+        //printf("target: %d.%d.%d.%d\n", ipv4_data[16] & 0xFF, ipv4_data[17] & 0xFF, ipv4_data[18] & 0xFF, ipv4_data[19] & 0xFF);
         printf(" [IPv4] Tam: %d - ", data_length);
-        printf("Orig: %d.%d.%d.%d - ", ipv4_data[12] & 0xff, ipv4_data[13] & 0xff, ipv4_data[14] & 0xff, ipv4_data[15] & 0xff);
-        printf("Alvo: %d.%d.%d.%d\n", ipv4_data[16] & 0xff, ipv4_data[17] & 0xff, ipv4_data[18] & 0xff, ipv4_data[19] & 0xff);
+        printf("Orig: %d.%d.%d.%d - ", ipv4_data[12] & 0xFF, ipv4_data[13] & 0xFF, ipv4_data[14] & 0xFF, ipv4_data[15] & 0xFF);
+        printf("Alvo: %d.%d.%d.%d\n", ipv4_data[16] & 0xFF, ipv4_data[17] & 0xFF, ipv4_data[18] & 0xFF, ipv4_data[19] & 0xFF);
         on_udp_received(ipv4_data + 20, data_length - 20);
     } else {
         // Não é DHCP, pois dhcp não tem campo opcoes no ip
@@ -519,12 +525,12 @@ void on_ethernet_package_received(char target[6], char origin[6], ethernet_conte
             if (is_origin_mac(origin)) {
                 printf("(Self)\n");
             } else {
-                printf("%02x:%02x:%02x:%02x:%02x:%02x\n", origin[0] & 0xff, origin[1] & 0xff, origin[2] & 0xff, origin[3] & 0xff, origin[4] & 0xff, origin[5] & 0xff);
+                printf("%02x:%02x:%02x:%02x:%02x:%02x\n", origin[0] & 0xFF, origin[1] & 0xFF, origin[2] & 0xFF, origin[3] & 0xFF, origin[4] & 0xFF, origin[5] & 0xFF);
             }
             on_ipv4_broadcast(ethernet_data + 14, data_length - 14);
             printf("\n");
         }
-        // debug // if (data_length > 130) { printf("Origin: %2x:%2x:%2x:%2x:%2x:%2x \n\n", target[0] & 0xff,target[1] & 0xff,target[2] & 0xff,target[3] & 0xff,target[4] & 0xff,target[5] & 0xff); }
+        // debug // if (data_length > 130) { printf("Origin: %2x:%2x:%2x:%2x:%2x:%2x \n\n", target[0] & 0xFF,target[1] & 0xFF,target[2] & 0xFF,target[3] & 0xFF,target[4] & 0xFF,target[5] & 0xFF); }
     }
 }
 
@@ -585,8 +591,8 @@ int main(int argc,char *argv[]) {
     write_to = (char *) self_mac_address;
     get_interface_mac_address(interface_selecionada, &write_to);
 
-    printf("Interface: \"%s\" - Ip: %d.%d.%d.%d - ", interface_selecionada, self_ip_address[0] & 0xff, self_ip_address[1] & 0xff, self_ip_address[2] & 0xff, self_ip_address[3] & 0xff);
-    printf("MAC: %02x:%02x:%02x:%02x:%02x:%02x\n", self_mac_address[0] & 0xff, self_mac_address[1] & 0xff, self_mac_address[2] & 0xff, self_mac_address[3] & 0xff, self_mac_address[4] & 0xff, self_mac_address[5] & 0xff);
+    printf("Interface: \"%s\" - Ip: %d.%d.%d.%d - ", interface_selecionada, self_ip_address[0] & 0xFF, self_ip_address[1] & 0xFF, self_ip_address[2] & 0xFF, self_ip_address[3] & 0xFF);
+    printf("MAC: %02x:%02x:%02x:%02x:%02x:%02x\n", self_mac_address[0] & 0xFF, self_mac_address[1] & 0xFF, self_mac_address[2] & 0xFF, self_mac_address[3] & 0xFF, self_mac_address[4] & 0xFF, self_mac_address[5] & 0xFF);
 
     /* Setar a interface em modo promiscuo */
     strcpy(ifr.ifr_name, interface_selecionada);
@@ -606,11 +612,11 @@ int main(int argc,char *argv[]) {
     /* Leitura dos pacotes */
     printf("Iniciando processo de leitura de pacotes\n----------------------------------------\n\n");
     while (1) {
-        length = recvfrom(sockfd,(char *) &raw_in_buff, sizeof(raw_in_buff), 0x0, NULL, NULL);
+        length = recvfrom(sockfd,(char *) &raw_in_buFF, sizeof(raw_in_buFF), 0x0, NULL, NULL);
         if (length <= 0) {
             printf("Recebido mensagem sem dados, algo esta errado\n");
         } else {
-            type_or_length = (raw_in_buff[12] << 8) + raw_in_buff[13];
+            type_or_length = (raw_in_buFF[12] << 8) + raw_in_buFF[13];
             ethernet_content_type type = Eth_UNKNOWN;
             if (type_or_length <= 1500) {
                 type = Eth_RAW_ETHERNET;
@@ -623,9 +629,9 @@ int main(int argc,char *argv[]) {
             } else if (type_or_length == 0x86dd) {
                 type = Eth_IPv6;
             }
-            memcpy((void *) target, raw_in_buff, 6);
-            memcpy((void *) origin, raw_in_buff+6, 6);
-            on_ethernet_package_received(target, origin, type, raw_in_buff, length);
+            memcpy((void *) target, raw_in_buFF, 6);
+            memcpy((void *) origin, raw_in_buFF+6, 6);
+            on_ethernet_package_received(target, origin, type, raw_in_buFF, length);
         }
     }
     close(sockfd);
