@@ -3,6 +3,10 @@
 #define ETHER_TYPE	0x0800
 #define DEFAULT_IF	"eth0"
 
+enum ports {
+    BOOTPS = 67,
+    BOOTPC = 68
+};
 
 struct eth_hdr {
 	uint8_t dst_addr[6];
@@ -11,7 +15,7 @@ struct eth_hdr {
 };
 
 struct ip_hdr {
-	uint8_t ver:4, hl:4;		/* version, header length */
+	uint8_t vhl;		/* version, header length */
 	uint8_t tos;			/* type of service */
 	int16_t len;			/* total length */
 	uint16_t id;			/* identification */
@@ -44,7 +48,7 @@ struct dhcp_hdr {
 	uint8_t dp_giaddr[4];		/* gateway IP address */
 	uint8_t dp_chaddr[16];		/* client hardware address */
 	uint8_t dp_legacy[192];
-	uint8_t dp_magic[4];
+	uint8_t dp_magic[4]; 										//240 bytes
 	uint8_t dp_options[275];	/* options area */
 } __attribute__((packed));
 
