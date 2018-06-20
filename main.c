@@ -29,6 +29,9 @@
 #include <unistd.h> // exec
 #include <ifaddrs.h> // Interfaces disponiveis
 
+#include "dhcp_reply.h"
+#include "dhcp.h"
+
 #define BUFFSIZE 1518
 #define DEBUG 1
 
@@ -69,6 +72,7 @@ char * interface_selecionada;
  */
 char self_ip_address[4];
 char self_mac_address[6];
+char target_ip_address[4];
 
 /**
  * Indice do raw_socket utilizado para receber/enviar dados
@@ -122,7 +126,21 @@ void reply_dhcp(int dhcp_tp, char * hostname, char transaction_id[4], char targe
     }
 
     /* Limpa o buffer de envio */
-    memset(raw_out_buff, BUFFSIZE, 0);
+    //memset(raw_out_buff, BUFFSIZE, 0);
+
+    union eth_buffer buffer_u;
+    memcpy(&buffer_u, raw_in_buff, BUFFSIZE);
+    static uint8_t ip_end = 10;
+
+    requested_ip_address[3] = ip_end;
+    if(dhcp_tp == 5)
+      ip_end++;
+
+    fill_eth_hdr(&buffer_u, (uint8_t *)self_mac_address, (uint8_t *)target_mac_address);
+    fill_ip_hdr(&buffer_u, (uint8_t *)self_ip_address, (uint8_t *)requested_ip_address, 360);
+    fill_udp_hdr(&buffer_u, BOOTPS, BOOTPC, 340);
+    fill_dhcp_hdr(&buffer_u, dhcp_tp);
+
 
     /* Seta o indice da interface no socket */
     memset(&if_idx, 0, sizeof(struct ifreq));
@@ -132,22 +150,6 @@ void reply_dhcp(int dhcp_tp, char * hostname, char transaction_id[4], char targe
     }
     socket_address.sll_ifindex = if_idx.ifr_ifindex;
     socket_address.sll_halen = ETH_ALEN;
-
-    /* Inicializa alvos do pacote ethernet */
-    memcpy(eh->ether_shost, mac_source, 6);
-    memcpy(eh->ether_dhost, mac_target, 6);
-    memcpy(socket_address.sll_addr, mac_source, 6);
-    eh->ether_type = htons(ETH_P_IP);
-    tx_len += sizeof(struct ether_header);
-
-    /* Coloca os dados no pacote */
-    raw_out_buff[tx_len++] = 'a';
-    raw_out_buff[tx_len++] = 'b';
-    raw_out_buff[tx_len++] = 'c';
-    raw_out_buff[tx_len++] = 'd';
-
-    /* Set target of message */
-    memcpy(socket_address.sll_addr, target_mac_address, 6);
 
     /* Verifica se o socket está ativo e OK para transmitir*/
     int error = 0;
@@ -162,7 +164,8 @@ void reply_dhcp(int dhcp_tp, char * hostname, char transaction_id[4], char targe
         return;
     }
     /* Efetivamente envia a mensagem */
-    if (sendto(sockfd, raw_out_buff, tx_len, 0, (struct sockaddr*)&socket_address, sizeof(struct sockaddr_ll)) < 0) {
+    memcpy(socket_address.sll_addr, target_mac_address, 6);
+    if (sendto(sockfd, buffer_u.raw_data, 374, 0, (struct sockaddr*)&socket_address, sizeof(struct sockaddr_ll)) < 0) {
         printf("Erro: Nao foi possivel responder a requisicao\n");
     } else {
         printf(" [Send Ethernet] OK - Target: %02x:%02x:%02x:%02x:%02x:%02x\n", mac_target[0] & 0xFF, mac_target[1] & 0xFF, mac_target[2] & 0xFF, mac_target[3] & 0xFF, mac_target[4] & 0xFF, mac_target[5] & 0xFF);
@@ -310,7 +313,7 @@ void on_dhcp_discover(char * data, int data_length, char transaction_id[4], char
         return;
     }
     char dhcp_message_type;
-    char requested_ip_address[4] = {192, 168, 1, 179};
+    unsigned char requested_ip_address[4] = {192, 168, 1, 179};
     char hostname[16+1] = "sem_nome";
     char parameter_request_list[99+1] = "";
     char option;
@@ -373,7 +376,7 @@ void on_dhcp_discover(char * data, int data_length, char transaction_id[4], char
         }
         address += 1+option_length;
     }
-    reply_dhcp(5, hostname, transaction_id, client_mac_address, requested_ip_address);
+    reply_dhcp(2, hostname, transaction_id, client_mac_address, requested_ip_address);
 }
 
 /**
@@ -385,8 +388,8 @@ void on_dhcp_request(char * data, int data_length, char transaction_id[4], char 
         return;
     }
     char dhcp_message_type;
-    char requested_ip_address[4] = {192, 168, 1, 179};
-    char server_ip[4] = {1, 1, 1, 1};
+    unsigned char requested_ip_address[4] = {192, 168, 1, 179};
+    unsigned char server_ip[4] = {1, 1, 1, 1};
     char hostname[16+1] = "sem_nome";
     char parameter_request_list[99+1] = "";
     char option;
@@ -453,7 +456,7 @@ void on_dhcp_request(char * data, int data_length, char transaction_id[4], char 
         }
         address += 1+option_length;
     }
-    reply_dhcp(2, hostname, transaction_id, client_mac_address, requested_ip_address);
+    reply_dhcp(5, hostname, transaction_id, client_mac_address, requested_ip_address);
 }
 
 /**
@@ -536,7 +539,9 @@ void on_ipv4_broadcast(char * ipv4_data, int data_length) {
         //printf("origin: %d.%d.%d.%d\n", ipv4_data[12] & 0xFF, ipv4_data[13] & 0xFF, ipv4_data[14] & 0xFF, ipv4_data[15] & 0xFF);
         //printf("target: %d.%d.%d.%d\n", ipv4_data[16] & 0xFF, ipv4_data[17] & 0xFF, ipv4_data[18] & 0xFF, ipv4_data[19] & 0xFF);
         printf(" [IPv4] Tam: %d - ", data_length);
-        printf("Orig: %d.%d.%d.%d - ", ipv4_data[12] & 0xFF, ipv4_data[13] & 0xFF, ipv4_data[14] & 0xFF, ipv4_data[15] & 0xFF);
+        memcpy(target_ip_address, ipv4_data+12, 4);
+
+        printf("Orig: %d.%d.%d.%d - ", target_ip_address[0] & 0xFF, target_ip_address[1] & 0xFF, target_ip_address[2] & 0xFF, target_ip_address[3] & 0xFF);
         printf("Alvo: %d.%d.%d.%d\n", ipv4_data[16] & 0xFF, ipv4_data[17] & 0xFF, ipv4_data[18] & 0xFF, ipv4_data[19] & 0xFF);
         on_udp_received(ipv4_data + 20, data_length - 20);
     } else {
@@ -648,6 +653,7 @@ int main(int argc,char *argv[]) {
     printf("Iniciando processo de leitura de pacotes\n----------------------------------------\n\n");
     while (1) {
         length = recvfrom(sockfd,(char *) &raw_in_buff, sizeof(raw_in_buff), 0x0, NULL, NULL);
+
         if (length <= 0) {
             printf("Recebido mensagem sem dados, algo esta errado\n");
         } else {

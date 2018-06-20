@@ -1,5 +1,6 @@
 #include<stdint.h>
 #define ETH_LEN	1518
+#define PROTO_UDP	17
 #define ETHER_TYPE	0x0800
 #define DEFAULT_IF	"eth0"
 

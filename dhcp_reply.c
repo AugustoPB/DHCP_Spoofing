@@ -14,6 +14,23 @@ static uint32_t ipchksum(void *packet)
 	return sum;
 }
 
+void get_dhcp_options(uint8_t *option_value, uint8_t *options, uint8_t option)
+{
+	int i = 0;
+	while (options[i] != 0xff)
+	{
+		if(options[i] == option)
+		{
+			memcpy(option_value,&options[i+2], options[i+1]);
+			return;
+		}
+		else
+		{
+			i += 2 + options[i+1];
+		}
+	}
+}
+
 void fill_eth_hdr(union eth_buffer *buffer_u, unsigned char srcMAC[6], unsigned char dstMAC[6])
 {
 	/* fill the Ethernet frame header */
@@ -65,7 +82,7 @@ void fill_dhcp_hdr(union eth_buffer *buffer_u ,int dhcp_tp)
 	memcpy(buffer_u->cooked_data.payload.udp.payload.dhcp.dp_yiaddr, buffer_u->cooked_data.payload.ip.dst, 4); // New client's IP
 	memcpy(buffer_u->cooked_data.payload.udp.payload.dhcp.dp_siaddr, buffer_u->cooked_data.payload.ip.src, 4); // My IP
 	memset(buffer_u->cooked_data.payload.udp.payload.dhcp.dp_giaddr, 0, 6); // Don't care
-	//buffer_u->cooked_data.payload.udp.payload.dhcp.dp_chaddr // Client MAC
+	memcpy(buffer_u->cooked_data.payload.udp.payload.dhcp.dp_chaddr, buffer_u->cooked_data.ethernet.dst_addr, 6); // Client MAC
 	memset(buffer_u->cooked_data.payload.udp.payload.dhcp.dp_legacy, 0, sizeof(buffer_u->cooked_data.payload.udp.payload.dhcp.dp_legacy)); // Don't care
 	memcpy(buffer_u->cooked_data.payload.udp.payload.dhcp.dp_magic,"\x63\x82\x53\x63",4); // Client cares :)
 

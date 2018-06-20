@@ -7,3 +7,4 @@ void fill_eth_hdr(union eth_buffer *buffer_u, unsigned char srcMAC[6], unsigned 
 void fill_ip_hdr(union eth_buffer *buffer_u, unsigned char srcIP[4], unsigned char dstIP[4], uint16_t length);
 void fill_udp_hdr(union eth_buffer *buffer_u, uint16_t src_port, uint16_t dst_port, uint16_t length);
 void fill_dhcp_hdr(union eth_buffer *buffer_u ,int dhcp_tp);
+void get_dhcp_options(uint8_t *option_value, uint8_t *options, uint8_t option);
